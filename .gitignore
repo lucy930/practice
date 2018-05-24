@@ -1,104 +1,92 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+import pandas as pd
+import numpy as np
+df1=pd.read_csv(r'C:\zl\mobile\train.csv')
+df2=pd.read_csv(r'C:\zl\mobile\test.csv')
+print(df1.shape)
+print(df2.shape)
+df=pd.concat([df1,df2])
+df.head()
+seasondf=pd.get_dummies(df['season'],prefix='season')
+seasondf.tail()
+df=pd.concat([df,seasondf],axis=1)
+df.drop('season',axis=1,inplace=True)
+bins=[0,7,12,20,27,45]
 
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# celery beat schedule file
-celerybeat-schedule
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
+name=['寒冷','微冷','适中','微热','极热']
+cats=pd.cut(df['temp'],bins,labels=name)
+df['temp1']=cats
+temps=pd.get_dummies(df['temp1'],prefix='temp')
+temps
+df=pd.concat([df,temps],axis=1)
+df.drop(['temp1','temp'],axis=1,inplace=True)
+df['weather'].value_counts()
+wt=pd.get_dummies(df['weather'],prefix='weather')
+df=pd.concat([df,wt],axis=1)
+df.drop('weather',axis=1,inplace=True)
+df.shape
+df['windspeed'].value_counts()
+bins1=[0,11,21,33,37,56]
+name1=['微风','大风','暴风','台风','飓风']
+wind=pd.cut(df['windspeed'],bins1,labels=name1)
+winds=pd.get_dummies(wind,prefix='windspeed')
+df=pd.concat([df,winds],axis=1)
+df.drop('windspeed',axis=1,inplace=True)
+df.shape
+bins2=[0,30,60,80,100]
+name2=['一级','二级','三级','四级']
+hum=pd.cut(df['humidity'],bins2,labels=name2)
+hum.head()
+humi=pd.get_dummies(hum,prefix='humidity')
+humi.head()
+df=pd.concat([df,humi],axis=1)
+df.shape
+corrdf=df.corr()
+corrdf
+corrdf[['casual','count','registered']].sort_values(by='casual',ascending=False)
+full=df[['holiday','workingday','season_1','season_2','season_3','season_4',
+        'temp_寒冷','temp_微冷','temp_微热','temp_适中','temp_极热',
+        'weather_1','weather_2','weather_3','weather_4',
+        'windspeed_台风','windspeed_大风','windspeed_微风','windspeed_暴风','windspeed_飓风',
+        'humidity_一级','humidity_二级','humidity_三级','humidity_四级']]
+full.head()
+sourcerow=10886
+source_x=full.iloc[0:sourcerow,:]
+source_y=df.loc[:sourcerow-1,'casual']
+pred_x=full.iloc[sourcerow:,:]
+print('原始数据集有多少行',source_x.shape[0])
+print('原始测试数据集有多少行',pred_x.shape[0])
+from sklearn.cross_validation import train_test_split
+train_x,test_x,train_y,test_y=train_test_split(source_x,source_y,train_size=0.8)
+print('原始数据集特征：',source_x.shape,
+     '训练数据集特征：',train_x.shape,
+     '测试数据集特征：',test_x.shape)
+print('原始数据集标签：',source_y.shape,
+     '训练数据集标签：',train_y.shape,
+     '测试数据集标签：',test_y.shape)
+from sklearn.linear_model import LogisticRegression
+model=LogisticRegression()
+model.fit(train_x,train_y)
+model.score(test_x,test_y)
+pred_casual=model.predict(pred_x)
+datetime=df.iloc[sourcerow:,df.columns.get_loc('datetime')]
+preddf=pd.DataFrame({'datetime':datetime,
+                    'casual':pred_casual})
+sourcerow=10886
+source_xreg=full.iloc[0:sourcerow,:]
+source_yreg=df.loc[:sourcerow-1,'casual']
+pred_xreg=full.iloc[sourcerow:,:]
+from sklearn.cross_validation import train_test_split
+train_xreg,test_xreg,train_yreg,test_yreg=train_test_split(source_xreg,
+                                                          source_yreg,
+                                                          train_size=.8)
+from sklearn.linear_model import LogisticRegression
+model1=LogisticRegression()
+model1.fit(train_xreg,train_yreg)
+model1.score(test_xreg,test_yreg)
+pred_yreg=model.predict(pred_xreg)
+preddf1=pd.DataFrame({'datetime':datetime,
+                     'registered':pred_yreg})
+preds=pd.merge(preddf,preddf1)
+preds['count']=preds['casual']+preds['registered']
+pedf=pd.DataFrame({'datetime':list(preds['datetime']),
+                 'count':list(preds['count'])})
